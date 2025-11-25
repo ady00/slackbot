@@ -74,12 +74,10 @@ const handleMessageEvent = async (event) => {
     console.log('🚩 FLAGGED AS RELEVANT');
     console.log('Category:', classification.category.toUpperCase());
     console.log('Confidence:', (classification.confidence * 100).toFixed(0) + '%');
-    if (classification.categories.length > 1) {
-      console.log('All Categories:', classification.categories.join(', '));
-    }
+    console.log('Reasoning:', classification.reasoning);
   } else {
     console.log('⚪ IRRELEVANT (filtered out)');
-    console.log('Reason: Casual conversation or non-actionable message');
+    console.log('Reasoning:', classification.reasoning);
   }
   
   console.log('='.repeat(80) + '\n');

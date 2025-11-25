@@ -13,6 +13,10 @@ const config = {
     url: process.env.SUPABASE_URL,
     anonKey: process.env.SUPABASE_ANON_KEY,
   },
+  gemini: {
+    apiKey: process.env.GEMINI_API_KEY,
+    model: process.env.MODEL_TO_USE || 'gemini-2.0-flash',
+  },
   server: {
     port: process.env.PORT || 3000,
     nodeEnv: process.env.NODE_ENV || 'development',
@@ -24,6 +28,7 @@ const validateConfig = () => {
   
   if (!config.slack.botToken) missing.push('SLACK_BOT_TOKEN');
   if (!config.slack.signingSecret) missing.push('SLACK_SIGNING_SECRET');
+  if (!config.gemini.apiKey) missing.push('GEMINI_API_KEY');
   
   if (missing.length > 0) {
     console.warn('⚠️  Warning: Missing environment variables:', missing.join(', '));

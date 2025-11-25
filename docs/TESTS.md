@@ -13,8 +13,6 @@
 ## Summary
 ✅ **9/10 tests passing** (90% accuracy)
 
-Run tests: `cd backend && node test-classifier.js`
-
 ## Test Cases
 
 ### ✅ Passing Tests (9/10)
