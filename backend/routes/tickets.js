@@ -6,6 +6,8 @@ const {
   updateTicketStatus 
 } = require('../services/ticketService');
 
+// TODO: Add pagination and filtering options
+
 /**
  * GET /api/tickets
  * Get all tickets with message counts

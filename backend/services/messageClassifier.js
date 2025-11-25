@@ -24,35 +24,27 @@ const classifyMessage = async (messageData) => {
   try {
     const model = genAI.getGenerativeModel({ model: config.gemini.model });
 
-    const prompt = `You are a classifier for a Forward-Deployed Engineer (FDE) support system. Analyze this Slack message and determine if it's critical/relevant.
+    // Concise prompt for faster response
+    const prompt = `Classify Slack message for FDE system.
 
-RELEVANT CATEGORIES (respond with one):
-- support: Help requests, "how do I", troubleshooting, stuck on something
-- bug: Error reports, crashes, things broken/not working, unexpected behavior
-- feature_request: Enhancement suggestions, "can we add", "would be nice to have"
-- question: Product/deployment questions, clarifications about functionality
-- irrelevant: Greetings, thanks, acknowledgments, casual chat, social plans
+Categories:
+- support: help requests, troubleshooting
+- bug: errors, crashes, broken functionality
+- feature_request: enhancement suggestions
+- question: product/deployment questions
+- irrelevant: greetings, thanks, casual chat
 
-MESSAGE: "${text}"
+Message: "${text}"
 
-Respond in JSON format only:
-{
-  "category": "support|bug|feature_request|question|irrelevant",
-  "confidence": 0.0-1.0,
-  "reasoning": "brief explanation"
-}`;
+Respond JSON only:
+{"category": "support|bug|feature_request|question|irrelevant", "confidence": 0.0-1.0, "reasoning": "brief reason"}`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    const responseText = response.text();
+    let jsonText = response.text().trim();
     
-    // Extract JSON from response (handle markdown code blocks)
-    let jsonText = responseText.trim();
-    if (jsonText.startsWith('```json')) {
-      jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-    } else if (jsonText.startsWith('```')) {
-      jsonText = jsonText.replace(/```\n?/g, '');
-    }
+    // Clean markdown
+    jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
     
     const classification = JSON.parse(jsonText);
 
@@ -67,7 +59,7 @@ Respond in JSON format only:
     };
 
   } catch (error) {
-    console.error('Gemini classification error:', error);
+    console.error('Gemini classification error:', error.message);
     
     // Fallback: if message is very short or common phrases, mark irrelevant
     const shortPhrases = /^(thanks?|ty|ok|okay|hi|hello|hey|bye|lol|haha)$/i;

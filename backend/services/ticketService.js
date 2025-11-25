@@ -6,74 +6,146 @@ const genAI = new GoogleGenerativeAI(config.gemini.apiKey);
 
 /**
  * Generate a group key and summary for a message
- * This determines which ticket the message should be grouped with
+ * Optimized for speed - single AI call with concise prompt
  */
 const generateGroupingMetadata = async (messageText, category) => {
   try {
     const model = genAI.getGenerativeModel({ model: config.gemini.model });
 
-    const prompt = `Extract the core issue/request from this ${category} message. Create a normalized group key that can match similar requests.
+    // Concise prompt for faster response
+    const prompt = `Extract core issue. Respond JSON only:
+{"group_key": "short-kebab-case", "summary": "brief summary"}
 
-MESSAGE: "${messageText}"
-
-Respond in JSON format:
-{
-  "group_key": "short-kebab-case-key-describing-core-issue",
-  "summary": "Brief 1-sentence summary of what user wants/needs"
-}
-
-Examples:
-- "Login button broken on mobile" → {"group_key": "login-mobile-bug", "summary": "Login functionality not working on mobile devices"}
-- "Can we export to CSV?" → {"group_key": "csv-export-feature", "summary": "Request for CSV export functionality"}
-- "Add dark mode please" → {"group_key": "dark-mode-feature", "summary": "Request for dark mode theme"}`;
+Message: "${messageText}"
+Category: ${category}`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
     let jsonText = response.text().trim();
     
-    // Clean up markdown
-    if (jsonText.startsWith('```json')) {
-      jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-    } else if (jsonText.startsWith('```')) {
-      jsonText = jsonText.replace(/```\n?/g, '');
-    }
+    // Clean markdown
+    jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
     
     const metadata = JSON.parse(jsonText);
     return metadata;
 
   } catch (error) {
-    console.error('Error generating grouping metadata:', error);
-    // Fallback: use first 5 words as group key
-    const words = messageText.toLowerCase().split(/\s+/).slice(0, 5).join('-');
+    console.error('Error generating grouping metadata:', error.message);
+    // Fallback: deterministic group key from first words
+    const normalized = messageText.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '')
+      .split(/\s+/)
+      .filter(w => w.length > 2)
+      .slice(0, 4)
+      .join('-');
+    
     return {
-      group_key: words.replace(/[^a-z0-9-]/g, ''),
+      group_key: normalized || 'unknown-issue',
       summary: messageText.substring(0, 100)
     };
   }
 };
 
 /**
- * Find an existing ticket that matches this message
- * Uses exact group_key match and category match
+ * Calculate similarity score between two group keys using Jaccard similarity
+ * @param {string} key1 - First group key
+ * @param {string} key2 - Second group key
+ * @returns {number} - Similarity score between 0 and 1
  */
-const findMatchingTicket = async (groupKey, category) => {
+const calculateSimilarity = (key1, key2) => {
+  const words1 = new Set(key1.split('-').filter(w => w.length > 2));
+  const words2 = new Set(key2.split('-').filter(w => w.length > 2));
+  
+  if (words1.size === 0 || words2.size === 0) return 0;
+  
+  // Jaccard similarity: intersection / union
+  const intersection = new Set([...words1].filter(w => words2.has(w)));
+  const union = new Set([...words1, ...words2]);
+  
+  return intersection.size / union.size;
+};
+
+/**
+ * Find an existing ticket that matches this message
+ * Uses multi-level matching strategy:
+ * 1. Exact match on group_key + category
+ * 2. Fuzzy match using Jaccard similarity (threshold: 0.6)
+ * 3. Summary text similarity for edge cases
+ */
+const findMatchingTicket = async (groupKey, category, summary) => {
   try {
-    const { data, error } = await supabase
+    // Level 1: Exact match
+    const { data: exactMatch, error: exactError } = await supabase
       .from('tickets')
       .select('*')
       .eq('group_key', groupKey)
       .eq('category', category)
-      .eq('status', 'open') // Only match with open tickets
+      .in('status', ['open', 'in_progress'])
+      .order('created_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
-      throw error;
+    if (exactError) throw exactError;
+    if (exactMatch) {
+      console.log('✅ Exact match found:', exactMatch.group_key);
+      return exactMatch;
     }
 
-    return data; // null if not found
+    // Level 2: Fuzzy match on group_key (Jaccard similarity)
+    const keyWords = groupKey.split('-').filter(w => w.length > 2);
+    
+    if (keyWords.length >= 2) {
+      const { data: candidates, error: fuzzyError } = await supabase
+        .from('tickets')
+        .select('*')
+        .eq('category', category)
+        .in('status', ['open', 'in_progress'])
+        .limit(20); // Increased for better fuzzy matching
+
+      if (fuzzyError) throw fuzzyError;
+
+      // Find best matching ticket using Jaccard similarity
+      let bestMatch = null;
+      let bestScore = 0;
+      const SIMILARITY_THRESHOLD = 0.6; // 60% similarity required
+
+      for (const ticket of candidates) {
+        const score = calculateSimilarity(groupKey, ticket.group_key);
+        
+        if (score >= SIMILARITY_THRESHOLD && score > bestScore) {
+          bestScore = score;
+          bestMatch = ticket;
+        }
+      }
+
+      if (bestMatch) {
+        console.log(`🔍 Fuzzy match found (${(bestScore * 100).toFixed(0)}% similar):`, 
+                    bestMatch.group_key, '≈', groupKey);
+        return bestMatch;
+      }
+    }
+
+    // Level 3: Summary text similarity (fallback for very short group keys)
+    if (summary && summary.length > 20) {
+      const { data: summaryMatches, error: summaryError } = await supabase
+        .from('tickets')
+        .select('*')
+        .eq('category', category)
+        .in('status', ['open', 'in_progress'])
+        .textSearch('similarity_summary', summary.split(' ').slice(0, 5).join(' & '))
+        .limit(3);
+
+      if (!summaryError && summaryMatches && summaryMatches.length > 0) {
+        // Return the most recent summary match
+        console.log('📝 Summary match found:', summaryMatches[0].group_key);
+        return summaryMatches[0];
+      }
+    }
+
+    console.log('🆕 No matching ticket found - will create new');
+    return null;
   } catch (error) {
-    console.error('Error finding matching ticket:', error);
+    console.error('Error finding matching ticket:', error.message);
     return null;
   }
 };
@@ -111,6 +183,7 @@ const createTicket = async (messageData, classification, groupKey, summary) => {
 
 /**
  * Store a message in the database
+ * Prevents duplicates via unique constraint on slack_ts
  */
 const storeMessage = async (messageData, classification, ticketId = null) => {
   try {
@@ -135,9 +208,9 @@ const storeMessage = async (messageData, classification, ticketId = null) => {
       .single();
 
     if (error) {
-      // Handle duplicate message (already processed)
-      if (error.code === '23505') { // Unique violation
-        console.log('⚠️  Message already processed:', messageData.ts);
+      // Duplicate message already processed
+      if (error.code === '23505') {
+        console.log('⚠️  Duplicate message ignored:', messageData.ts);
         return null;
       }
       throw error;
@@ -145,24 +218,25 @@ const storeMessage = async (messageData, classification, ticketId = null) => {
 
     return data;
   } catch (error) {
-    console.error('Error storing message:', error);
+    console.error('Error storing message:', error.message);
     throw error;
   }
 };
 
 /**
  * Main function: Group and store a classified message
+ * Optimized for minimal latency and API calls
  */
 const groupAndStoreMessage = async (messageData, classification) => {
   try {
-    // If message is irrelevant, just store it without a ticket
+    // If irrelevant, store without ticket creation
     if (!classification.isRelevant) {
       await storeMessage(messageData, classification, null);
-      console.log('📝 Stored irrelevant message (no ticket created)');
+      console.log('📝 Stored irrelevant message');
       return { ticket: null, message: 'stored', grouped: false };
     }
 
-    // Generate grouping metadata using AI
+    // Generate grouping metadata (single AI call)
     const { group_key, summary } = await generateGroupingMetadata(
       messageData.text,
       classification.category
@@ -170,24 +244,25 @@ const groupAndStoreMessage = async (messageData, classification) => {
 
     console.log('🔍 Group key:', group_key);
 
-    // Try to find an existing ticket with the same group key
-    let ticket = await findMatchingTicket(group_key, classification.category);
+    // Find matching ticket (fuzzy matching enabled)
+    let ticket = await findMatchingTicket(group_key, classification.category, summary);
 
     if (ticket) {
-      // Found existing ticket - group this message with it
-      console.log('🎯 Matched to existing ticket:', ticket.id, '-', ticket.title);
+      // Existing ticket found - group message
+      console.log('🎯 Matched to existing ticket:', ticket.id);
       await storeMessage(messageData, classification, ticket.id);
       return { ticket, message: 'grouped', grouped: true };
     } else {
-      // No matching ticket - create a new one
+      // No match - create new ticket
       ticket = await createTicket(messageData, classification, group_key, summary);
       await storeMessage(messageData, classification, ticket.id);
       return { ticket, message: 'new_ticket', grouped: false };
     }
 
   } catch (error) {
-    console.error('Error in groupAndStoreMessage:', error);
-    // Still try to store the message even if grouping fails
+    console.error('Error in groupAndStoreMessage:', error.message);
+    
+    // Fallback: store message without grouping
     try {
       await storeMessage(messageData, classification, null);
       return { ticket: null, message: 'stored_without_grouping', error: error.message };
