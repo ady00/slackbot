@@ -19,14 +19,14 @@ const io = new Server(server, {
 
 app.set('io', io);
 
-app.use(cors()); // enable for frontend
+app.use(cors()); // enable for frontend stuff
 app.use(bodyParser.json());
 
 // Routes
 app.use("/slack", slackRoutes);
 app.use("/api/tickets", ticketRoutes);
 
-// Health check
+// this better work
 app.get("/", (req, res) => {
   res.json({ 
     status: "running",
