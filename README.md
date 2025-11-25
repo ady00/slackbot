@@ -1,6 +1,7 @@
 # Nixo FDE Slackbot
 
 Built by Advay.
+Video demo [featured here](https://drive.google.com/file/d/1dGX8jz7boIY7zipXIMLwoSZa9POGbIhc/view?usp=sharing)
 
 ## What It Does
 
@@ -106,66 +107,4 @@ ngrok http 3000
 
 ---
 
-## How It Works
-
-### 1. Message Reception
-
-Slack sends webhook to `/slack/events` when message posted.
-
-### 2. AI Classification
-
-Gemini 2.0 Flash analyzes message:
-
-```javascript
-{
-  "category": "bug",           // support | bug | feature_request | question | irrelevant
-  "confidence": 0.92,           // 0.0 - 1.0
-  "reasoning": "User reporting error",
-  "isRelevant": true
-}
-```
-
-**Irrelevant messages** are stored but don't create tickets.
-
-### 3. Grouping messages
-
-AI extracts core issue into kebab-case key:
-
-```
-Input:  "Can't upload PDF files, getting 413 error"
-Output: "upload-pdf-413-error"
-```
-
-### 4. Fuzzy Matching
-
-System finds existing tickets using keyword matching.
-
-**Level 1: Exact Match**
-- Same group key + category
-
-**Level 2: Jaccard-esque Similarity**
-- Calculates word overlap: `intersection / union`
-- Threshold: 60%
-- Example: `upload-pdf-error` ≈ `pdf-upload-error` → **Grouped**
-
-**Level 3: Summary Text Search**
-- PostgreSQL full-text search on summaries
-- Fallback for short group keys
-
-### 5. Storage
-
-- **New issue** → Create ticket + store message
-- **Existing issue** → Link message to ticket
-- **Duplicates** → Prevented by unique constraint on `slack_ts`
-
----
-
-### Benchmarks
-
-| Operation | Target | Actual | Status |
-|-----------|--------|--------|--------|
-| AI Classification | <9s | ~0.5s | |
-| Group Key Generation | <9s | ~0.5s | |
-| Fuzzy Matching | <9s | ~0.1s | |
-| Database Write | <9s | ~0.1s | |
-| **Total E2E** | **<9s** | **~1.5s** | |
+Check out the WRITEUP file for more info on the methodology behind the app. 
