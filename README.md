@@ -1,9 +1,8 @@
-# Nixo FDE Slackbot 🤖
+# Nixo FDE Slackbot
 
+Built by Advay.
 
-Built by **Advay** | November 2025
-
-## 🎯 What It Does
+## What It Does
 
 automatically:
 - **Listens** to Slack messages in real-time
@@ -14,17 +13,16 @@ automatically:
 - **Processes** messages in **<1.5 seconds** end-to-end
 ---
 
-## 🚀 Quick Start
-
-### Prerequisites
-
+### Prereqs!
 - **Node.js 16+** 
 - **Supabase Account** 
 - **Gemini API Key** 
 - **ngrok** 
 
 
-**1Clone and install dependencies**
+### To set up: 
+
+**1. Clone and install dependencies**
 
 ```bash
 cd backend
@@ -129,7 +127,7 @@ Gemini 2.0 Flash analyzes message:
 
 **Irrelevant messages** are stored but don't create tickets.
 
-### 3. Group Key Generation
+### 3. Grouping messages
 
 AI extracts core issue into kebab-case key:
 
@@ -140,12 +138,12 @@ Output: "upload-pdf-413-error"
 
 ### 4. Fuzzy Matching
 
-System finds existing tickets using **3-level strategy**:
+System finds existing tickets using keyword matching.
 
 **Level 1: Exact Match**
 - Same group key + category
 
-**Level 2: Jaccard Similarity**
+**Level 2: Jaccard-esque Similarity**
 - Calculates word overlap: `intersection / union`
 - Threshold: 60%
 - Example: `upload-pdf-error` ≈ `pdf-upload-error` → **Grouped**
