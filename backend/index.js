@@ -1,11 +1,25 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
+const http = require("http");
+const { Server } = require("socket.io");
 const slackRoutes = require("./routes/slack");
 const ticketRoutes = require("./routes/tickets");
 const { testConnection } = require("./services/supabaseClient");
 
 const app = express();
+const server = http.createServer(app);
+
+// Initialize Socket.IO with CORS
+const io = new Server(server, {
+  cors: {
+    origin: process.env.FRONTEND_URL || "http://localhost:3001",
+    methods: ["GET", "POST"]
+  }
+});
+
+// Make io accessible to routes
+app.set('io', io);
 
 // Middleware
 app.use(cors()); // Enable CORS for frontend
@@ -20,7 +34,8 @@ app.get("/", (req, res) => {
   res.json({ 
     status: "running",
     service: "Nixo FDE Slackbot",
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    websocket: "enabled"
   });
 });
 
@@ -30,11 +45,21 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
+// WebSocket connection handling
+io.on('connection', (socket) => {
+  console.log('🔌 Client connected:', socket.id);
+  
+  socket.on('disconnect', () => {
+    console.log('🔌 Client disconnected:', socket.id);
+  });
+});
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, async () => {
+server.listen(PORT, async () => {
   console.log(`🚀 Nixo FDE Slackbot listening on port ${PORT}`);
   console.log(`📡 Slack events endpoint: http://localhost:${PORT}/slack/events`);
   console.log(`📊 API endpoint: http://localhost:${PORT}/api/tickets`);
+  console.log(`🔌 WebSocket server running`);
   
   // Test Supabase connection
   console.log('\n🔌 Testing Supabase connection...');

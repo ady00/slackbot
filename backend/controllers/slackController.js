@@ -15,13 +15,14 @@ const handleUrlVerification = (req, res) => {
  */
 const handleSlackEvent = async (req, res) => {
   const { event } = req.body;
+  const io = req.app.get('io'); // Get Socket.IO instance
 
   // Acknowledge receipt immediately (Slack requires response within 3 seconds)
   res.sendStatus(200);
 
   // Process event asynchronously
   try {
-    await processEvent(event);
+    await processEvent(event, io);
   } catch (error) {
     console.error('Error processing Slack event:', error);
   }
@@ -30,12 +31,12 @@ const handleSlackEvent = async (req, res) => {
 /**
  * Process different types of Slack events
  */
-const processEvent = async (event) => {
+const processEvent = async (event, io) => {
   if (!event) return;
 
   // Handle message events
   if (event.type === 'message' && !event.subtype) {
-    await handleMessageEvent(event);
+    await handleMessageEvent(event, io);
   }
 
   // Handle other event types as needed
@@ -45,7 +46,7 @@ const processEvent = async (event) => {
 /**
  * Handle message events - classify and filter for FDE relevance
  */
-const handleMessageEvent = async (event) => {
+const handleMessageEvent = async (event, io) => {
   const { text, user, channel, ts, thread_ts } = event;
 
   // Skip bot messages
@@ -90,9 +91,26 @@ const handleMessageEvent = async (event) => {
     if (result.grouped) {
       console.log('🎯 GROUPED with existing ticket:', result.ticket.title);
       console.log('Ticket ID:', result.ticket.id);
+      
+      // Emit WebSocket event for ticket update
+      if (io) {
+        io.emit('ticket:updated', {
+          ticketId: result.ticket.id,
+          action: 'message_added',
+          timestamp: new Date().toISOString()
+        });
+      }
     } else if (result.ticket) {
       console.log('🆕 NEW TICKET created:', result.ticket.title);
       console.log('Ticket ID:', result.ticket.id);
+      
+      // Emit WebSocket event for new ticket
+      if (io) {
+        io.emit('ticket:created', {
+          ticket: result.ticket,
+          timestamp: new Date().toISOString()
+        });
+      }
     } else {
       console.log('📝 Message stored (no ticket - irrelevant)');
     }

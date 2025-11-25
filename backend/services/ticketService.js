@@ -329,11 +329,41 @@ const updateTicketStatus = async (ticketId, status, isFixed) => {
   }
 };
 
+/**
+ * Delete a ticket and its messages
+ */
+const deleteTicket = async (ticketId) => {
+  try {
+    // First delete all messages associated with the ticket
+    const { error: messagesError } = await supabase
+      .from('messages')
+      .delete()
+      .eq('ticket_id', ticketId);
+
+    if (messagesError) throw messagesError;
+
+    // Then delete the ticket
+    const { error: ticketError } = await supabase
+      .from('tickets')
+      .delete()
+      .eq('id', ticketId);
+
+    if (ticketError) throw ticketError;
+    
+    console.log('✅ Deleted ticket:', ticketId);
+    return true;
+  } catch (error) {
+    console.error('Error deleting ticket:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   groupAndStoreMessage,
   getAllTickets,
   getTicketMessages,
   updateTicketStatus,
+  deleteTicket,
   generateGroupingMetadata,
   findMatchingTicket
 };

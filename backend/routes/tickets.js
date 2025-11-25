@@ -3,7 +3,8 @@ const router = express.Router();
 const { 
   getAllTickets, 
   getTicketMessages, 
-  updateTicketStatus 
+  updateTicketStatus,
+  deleteTicket
 } = require('../services/ticketService');
 
 // TODO: Add pagination and filtering options
@@ -59,9 +60,47 @@ router.patch('/:id', async (req, res) => {
       is_fixed !== undefined ? is_fixed : false
     );
     
+    // Emit WebSocket event for ticket update
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('ticket:updated', {
+        ticketId: id,
+        action: 'status_changed',
+        status: status || currentTicket.status,
+        is_fixed: is_fixed !== undefined ? is_fixed : currentTicket.is_fixed,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
     res.json({ success: true, data: currentTicket });
   } catch (error) {
     console.error('Error updating ticket:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * DELETE /api/tickets/:id
+ * Delete a ticket and all its messages
+ */
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    await deleteTicket(id);
+    
+    // Emit WebSocket event for ticket deletion
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('ticket:deleted', {
+        ticketId: id,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    res.json({ success: true, message: 'Ticket deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting ticket:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
