@@ -1,4 +1,5 @@
 const { classifyMessage } = require('../services/messageClassifier');
+const { groupAndStoreMessage } = require('../services/ticketService');
 
 /**
  * Handle Slack URL verification challenge
@@ -80,12 +81,26 @@ const handleMessageEvent = async (event) => {
     console.log('Reasoning:', classification.reasoning);
   }
   
-  console.log('='.repeat(80) + '\n');
+  console.log('-'.repeat(80));
 
-  // TODO: Store in Supabase if relevant
-  // if (classification.isRelevant) {
-  //   await storeTicket(event, classification);
-  // }
+  // Group and store in Supabase
+  try {
+    const result = await groupAndStoreMessage(event, classification);
+    
+    if (result.grouped) {
+      console.log('🎯 GROUPED with existing ticket:', result.ticket.title);
+      console.log('Ticket ID:', result.ticket.id);
+    } else if (result.ticket) {
+      console.log('🆕 NEW TICKET created:', result.ticket.title);
+      console.log('Ticket ID:', result.ticket.id);
+    } else {
+      console.log('📝 Message stored (no ticket - irrelevant)');
+    }
+  } catch (error) {
+    console.error('❌ Error storing message:', error.message);
+  }
+  
+  console.log('='.repeat(80) + '\n');
 };
 
 module.exports = {
