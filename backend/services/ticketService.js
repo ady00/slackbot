@@ -13,29 +13,24 @@ const generateGroupingMetadata = async (messageText, category) => {
     const model = genAI.getGenerativeModel({ model: config.gemini.model });
 
     // Ultra-simple prompt - forces broad, consistent grouping
-    const prompt = `Extract 1-2 core words. Be VERY general. Use EXACT SAME words for similar requests.
+    const prompt = `Analyze this Slack message and provide:
+1. group_key: 1-2 words in kebab-case identifying the CORE RESOURCE (e.g., "supabase-access", "vercel-deploy")
+2. summary: A CLEAR TICKET TITLE (5-10 words) - THIS IS REQUIRED!
 
-CRITICAL: Use the SAME group_key for ALL messages about the same resource!
+CRITICAL RULES:
+- group_key: Use the SAME key for ALL messages about the same resource
+- summary: MUST be a professional ticket title, NEVER empty, NEVER just "brief"
 
-Examples (USE THESE EXACT PATTERNS):
-"Need Supabase API key" → {"group_key": "supabase-access"}
-"Who has Supabase password?" → {"group_key": "supabase-access"}
-"Supabase credentials please" → {"group_key": "supabase-access"}
-"I need the Supabase key!" → {"group_key": "supabase-access"}
-"Where's database key?" → {"group_key": "database-access"}
-"GPT-4 broken" → {"group_key": "gpt4-issue"}
-"API down" → {"group_key": "api-issue"}
-"Can't login" → {"group_key": "login-issue"}
-
-RULES:
-- 1-2 words ONLY (resource + action/topic)
-- Drop: "need", "request", "help", "please", "issue"
-- Keep: resource name + "access"/"issue"/"error"
+Examples:
+"Can you add export to CSV?" → {"group_key": "csv-export", "summary": "Feature request: Add CSV export functionality"}
+"The login page is broken" → {"group_key": "login-issue", "summary": "Login page not working correctly"}
+"I don't see a button for it" → {"group_key": "ui-missing", "summary": "Missing UI button or element"}
+"Who has access to Vercel?" → {"group_key": "vercel-access", "summary": "Request for Vercel deployment access"}
 
 Message: "${messageText}"
 
-JSON only:
-{"group_key": "resource-topic", "summary": "brief"}`;
+Respond with valid JSON only (no markdown, no code blocks):
+{"group_key": "resource-topic", "summary": "Clear descriptive ticket title"}`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
@@ -49,15 +44,23 @@ JSON only:
     // Force simplification: max 2 words
     if (metadata.group_key) {
       const parts = metadata.group_key.toLowerCase().split('-').filter(w => w.length > 2);
-      metadata.group_key = parts.slice(0, 2).join('-');
+      metadata.group_key = parts.slice(0, 2).join('-') || 'general-issue';
     }
 
-    // CRITICAL: Ensure summary is never null/empty
-  if (!metadata.summary || metadata.summary.trim() === '') {
-    metadata.summary = messageText.substring(0, 100);
-  }
+    // CRITICAL: Ensure summary is a proper title, not empty or placeholder
+    const invalidSummaries = ['brief', 'summary', 'title', 'n/a', 'na', 'none', ''];
+    if (!metadata.summary || 
+        metadata.summary.trim() === '' || 
+        invalidSummaries.includes(metadata.summary.toLowerCase().trim()) ||
+        metadata.summary.length < 5) {
+      // Generate a proper title from the message
+      const cleanMessage = messageText.replace(/[!?.,]+/g, '').trim();
+      metadata.summary = cleanMessage.length > 60 
+        ? cleanMessage.substring(0, 60) + '...'
+        : cleanMessage;
+    }
     
-    console.log(`Generated group key: "${metadata.group_key}" from "${messageText.substring(0, 50)}..."`);
+    console.log(`Generated: key="${metadata.group_key}" | title="${metadata.summary}"`);
     return metadata;
 
     
@@ -127,15 +130,19 @@ const calculateSimilarity = (key1, key2) => {
 
 /**
  * Find matching ticket - VERY aggressive matching
+ * 
+ * GROUPING STRATEGY:
+ * - Category is IGNORED when finding matches (QUESTION + SUPPORT about same resource → grouped)
+ * - The ticket KEEPS its original category from the first message
+ * - Each message stores its own category in the messages table
  */
 const findMatchingTicket = async (groupKey, category, summary) => {
   try {
-    // Level 1: Exact match
+    // Level 1: Exact match on group_key (ignore category!)
     const { data: exactMatch, error: exactError } = await supabase
       .from('tickets')
       .select('*')
       .eq('group_key', groupKey)
-      .eq('category', category)
       .in('status', ['open', 'in_progress'])
       .order('created_at', { ascending: false })
       .limit(1)
@@ -147,13 +154,12 @@ const findMatchingTicket = async (groupKey, category, summary) => {
       return exactMatch;
     }
 
-    // Level 2: Fuzzy match - VERY AGGRESSIVE
+    // Level 2: Fuzzy match - ignore category, match by resource similarity
     const { data: candidates, error: fuzzyError } = await supabase
       .from('tickets')
       .select('*')
-      .eq('category', category)
       .in('status', ['open', 'in_progress'])
-      .limit(50); // Check many candidates
+      .limit(50);
 
     if (fuzzyError) throw fuzzyError;
 
@@ -279,7 +285,10 @@ const groupAndStoreMessage = async (messageData, classification) => {
     let ticket = await findMatchingTicket(group_key, classification.category, summary);
 
     if (ticket) {
-      console.log('Matched to existing ticket:', ticket.id, '-', ticket.title);
+      // NOTE: Ticket keeps its ORIGINAL category from the first message
+      // New message's category is stored in messages table, but ticket category is unchanged
+      console.log(`Grouped into existing ticket: ${ticket.id} (${ticket.category}) - "${ticket.title}"`);
+      console.log(`  └─ New message category: ${classification.category} (preserved in messages table only)`);
       await storeMessage(messageData, classification, ticket.id);
       return { ticket, message: 'grouped', grouped: true };
     } else {
