@@ -61,6 +61,7 @@ Respond with valid JSON only (no markdown, no code blocks):
     }
     
     console.log(`Generated: key="${metadata.group_key}" | title="${metadata.summary}"`);
+    console.log(`Generated group key: "${metadata.group_key}" from "${messageText.substring(0, 50)}..."`);
     return metadata;
 
     
@@ -138,6 +139,8 @@ const calculateSimilarity = (key1, key2) => {
  */
 const findMatchingTicket = async (groupKey, category, summary) => {
   try {
+    console.log(`🔍 Searching for matching ticket with group_key: "${groupKey}"`);
+    
     // Level 1: Exact match on group_key (ignore category!)
     const { data: exactMatch, error: exactError } = await supabase
       .from('tickets')
@@ -148,11 +151,24 @@ const findMatchingTicket = async (groupKey, category, summary) => {
       .limit(1)
       .maybeSingle();
 
-    if (exactError) throw exactError;
+    if (exactError) {
+      console.error('❌ Exact match query error:', exactError);
+      throw exactError;
+    }
+    
+    console.log(`📊 Exact match result:`, exactMatch ? `Found ticket ${exactMatch.id} (status: ${exactMatch.status})` : 'No match');
+    
     if (exactMatch) {
-      console.log('Exact match found:', exactMatch.group_key);
+      console.log('✅ Exact match found:', exactMatch.group_key, '| ID:', exactMatch.id);
       return exactMatch;
     }
+    
+    // Debug: Check if there ARE any tickets with this group_key (regardless of status)
+    const { data: allWithKey } = await supabase
+      .from('tickets')
+      .select('id, group_key, status')
+      .eq('group_key', groupKey);
+    console.log(`📋 All tickets with group_key "${groupKey}" (any status):`, allWithKey?.length || 0, allWithKey || []);
 
     // Level 2: Fuzzy match - ignore category, match by resource similarity
     const { data: candidates, error: fuzzyError } = await supabase
@@ -197,13 +213,17 @@ const createTicket = async (messageData, classification, groupKey, summary) => {
   const safeTitle = summary && summary.trim() !== '' 
   ? summary 
   : messageData.text.substring(0, 100);
+  
+  // Normalize category to lowercase for database constraint
+  const normalizedCategory = classification.category?.toLowerCase() || 'question';
+  
   try {
     const { data, error } = await supabase
       .from('tickets')
       .insert([
         {
           title: safeTitle,
-          category: classification.category,
+          category: normalizedCategory,
           group_key: groupKey,
           similarity_summary: summary,
           first_channel_id: messageData.channel,
@@ -217,6 +237,7 @@ const createTicket = async (messageData, classification, groupKey, summary) => {
 
     if (error) throw error;
     console.log('Created new ticket:', data.id, '-', summary);
+    console.log(`  └─ Stored with group_key: "${data.group_key}" | status: "${data.status}"`);
     return data;
   } catch (error) {
     console.error('Error creating ticket:', error);
@@ -228,6 +249,9 @@ const createTicket = async (messageData, classification, groupKey, summary) => {
  * Store a message in the database
  */
 const storeMessage = async (messageData, classification, ticketId = null) => {
+  // Normalize category to lowercase for database constraint
+  const normalizedCategory = classification.category?.toLowerCase() || 'question';
+  
   try {
     const { data, error } = await supabase
       .from('messages')
@@ -239,7 +263,7 @@ const storeMessage = async (messageData, classification, ticketId = null) => {
           slack_user_id: messageData.user,
           slack_thread_ts: messageData.thread_ts || null,
           text: messageData.text,
-          category: classification.category,
+          category: normalizedCategory,
           is_relevant: classification.isRelevant,
           confidence: classification.confidence,
           reasoning: classification.reasoning,
