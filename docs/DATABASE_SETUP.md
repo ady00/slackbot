@@ -77,7 +77,7 @@ When a new relevant message arrives:
    - Same `group_key`
    - Same `category`
 4. **Grouping Decision**:
-   - **Match found**: Add message to existing ticket ✅ (no duplicate)
+   - **Match found**: Add message to existing ticket (no duplicate)
    - **No match**: Create new ticket 🆕
 
 ### Example Grouping Scenario

@@ -19,7 +19,7 @@ export function useWebSocket() {
     });
 
     socketInstance.on('connect', () => {
-      console.log('✅ WebSocket connected');
+      console.log('WebSocket connected');
       setIsConnected(true);
     });
 

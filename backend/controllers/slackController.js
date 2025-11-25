@@ -89,7 +89,7 @@ const handleMessageEvent = async (event, io) => {
     const result = await groupAndStoreMessage(event, classification);
     
     if (result.grouped) {
-      console.log('🎯 GROUPED with existing ticket:', result.ticket.title);
+      console.log('GROUPED with existing ticket:', result.ticket.title);
       console.log('Ticket ID:', result.ticket.id);
       
       // Emit WebSocket event for ticket update

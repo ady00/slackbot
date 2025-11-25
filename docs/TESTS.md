@@ -11,38 +11,38 @@
 # Automated Test Results - Message Classifier
 
 ## Summary
-✅ **9/10 tests passing** (90% accuracy)
+**9/10 tests passing** (90% accuracy)
 
 ## Test Cases
 
-### ✅ Passing Tests (9/10)
+### Passing Tests (9/10)
 
 1. **"The API is returning 500 errors when I try to upload files"**
-   - ✅ Classification: `bug` (confidence: 0.85)
+   - Classification: `bug` (confidence: 0.85)
 
 2. **"Can we add support for webhooks?"**
-   - ✅ Classification: `feature_request` (confidence: 0.8)
+   - Classification: `feature_request` (confidence: 0.8)
 
 3. **"Help! My dashboard won't load"**
-   - ✅ Classification: `support` (confidence: 0.8)
+   - Classification: `support` (confidence: 0.8)
 
 4. **"thanks!"**
-   - ✅ Classification: `irrelevant` (confidence: 0.9)
+   - Classification: `irrelevant` (confidence: 0.9)
 
 5. **"ok sounds good"**
-   - ✅ Classification: `irrelevant` (confidence: 0.9)
+   - Classification: `irrelevant` (confidence: 0.9)
 
 6. **"let's grab lunch tomorrow"**
-   - ✅ Classification: `irrelevant` (confidence: 0.9)
+   - Classification: `irrelevant` (confidence: 0.9)
 
 7. **"The app crashed when I clicked the export button"**
-   - ✅ Classification: `bug` (confidence: 0.85)
+   - Classification: `bug` (confidence: 0.85)
 
 8. **"Would be nice to have dark mode"**
-   - ✅ Classification: `feature_request` (confidence: 0.8)
+   - Classification: `feature_request` (confidence: 0.8)
 
 9. **"👍"**
-   - ✅ Classification: `irrelevant` (confidence: 0.9)
+   - Classification: `irrelevant` (confidence: 0.9)
 
 ### ⚠️ Edge Case (1/10)
 

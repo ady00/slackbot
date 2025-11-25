@@ -51,16 +51,9 @@ JSON only:
       const parts = metadata.group_key.toLowerCase().split('-').filter(w => w.length > 2);
       metadata.group_key = parts.slice(0, 2).join('-');
     }
-
-    // CRITICAL: Ensure summary is never null/empty
-  if (!metadata.summary || metadata.summary.trim() === '') {
-    metadata.summary = messageText.substring(0, 100);
-  }
     
     console.log(`Generated group key: "${metadata.group_key}" from "${messageText.substring(0, 50)}..."`);
     return metadata;
-
-    
 
   } catch (error) {
     console.error('Error generating grouping metadata:', error.message);
@@ -187,16 +180,12 @@ const findMatchingTicket = async (groupKey, category, summary) => {
  * Create a new ticket
  */
 const createTicket = async (messageData, classification, groupKey, summary) => {
-
-  const safeTitle = summary && summary.trim() !== '' 
-  ? summary 
-  : messageData.text.substring(0, 100);
   try {
     const { data, error } = await supabase
       .from('tickets')
       .insert([
         {
-          title: safeTitle,
+          title: summary,
           category: classification.category,
           group_key: groupKey,
           similarity_summary: summary,

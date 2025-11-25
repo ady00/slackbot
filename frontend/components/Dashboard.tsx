@@ -124,32 +124,26 @@ export function Dashboard() {
     fixed: tickets.filter(t => t.is_fixed).length
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading tickets...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="p-6 max-w-md">
-          <h2 className="text-lg font-semibold text-destructive mb-2">Error</h2>
-          <p className="text-muted-foreground">{error}</p>
-        </Card>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative">
+      {/* Discrete Loading Indicator - Top Right Corner */}
+      {loading && (
+        <div className="fixed top-20 right-6 z-50 flex items-center gap-2 bg-card border border-border rounded-lg px-4 py-2 shadow-lg">
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+          <span className="text-sm text-muted-foreground">Loading...</span>
+        </div>
+      )}
+
+      {/* Error Notification - Top Right Corner */}
+      {error && (
+        <div className="fixed top-20 right-6 z-50 bg-destructive/10 border border-destructive rounded-lg px-4 py-3 shadow-lg max-w-md">
+          <div className="text-destructive font-semibold mb-1">Error</div>
+          <p className="text-sm text-muted-foreground">{error}</p>
+        </div>
+      )}
+
       {/* Header */}
-      <header className="border-b border-border bg-card sticky top-0 z-10 backdrop-blur supports-[backdrop-filter]:bg-card/60">
+      <header className="border-b border-border bg-card sticky top-0 z-10 backdrop-blur supports-backdrop-filter:bg-card/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div>
@@ -234,18 +228,50 @@ export function Dashboard() {
               <p className="text-muted-foreground">No tickets found</p>
             </Card>
           ) : (
-            filteredTickets.map((ticket) => (
-              <TicketCard
-                key={ticket.id}
-                ticket={ticket}
-                messages={expandedTickets[ticket.id] || []}
-                isExpanded={!!expandedTickets[ticket.id]}
-                onToggleFixed={handleToggleFixed}
-                onStatusChange={handleStatusChange}
-                onViewMessages={handleViewMessages}
-                onDelete={handleDeleteTicket}
-              />
-            ))
+            (() => {
+              // Sort tickets: incomplete first, then completed
+              const sortedTickets = [...filteredTickets].sort((a, b) => {
+                // Completed tickets go to bottom
+                if (a.is_fixed && !b.is_fixed) return 1;
+                if (!a.is_fixed && b.is_fixed) return -1;
+                // Otherwise sort by created_at (newest first)
+                return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+              });
+
+              let hasShownSeparator = false;
+
+              return sortedTickets.map((ticket) => {
+                const isCompleted = ticket.is_fixed;
+                const isFirstCompleted = isCompleted && !hasShownSeparator;
+                
+                if (isFirstCompleted) {
+                  hasShownSeparator = true;
+                }
+
+                return (
+                  <div key={ticket.id}>
+                    {isFirstCompleted && (
+                      <div className="flex items-center gap-3 my-6">
+                        <div className="h-px bg-border flex-1" />
+                        <span className="text-sm text-muted-foreground font-medium">
+                          Completed
+                        </span>
+                        <div className="h-px bg-border flex-1" />
+                      </div>
+                    )}
+                    <TicketCard
+                      ticket={ticket}
+                      messages={expandedTickets[ticket.id] || []}
+                      isExpanded={!!expandedTickets[ticket.id]}
+                      onToggleFixed={handleToggleFixed}
+                      onStatusChange={handleStatusChange}
+                      onViewMessages={handleViewMessages}
+                      onDelete={handleDeleteTicket}
+                    />
+                  </div>
+                );
+              });
+            })()
           )}
         </div>
       </div>

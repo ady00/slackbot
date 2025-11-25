@@ -10,7 +10,6 @@ const { testConnection } = require("./services/supabaseClient");
 const app = express();
 const server = http.createServer(app);
 
-// Initialize Socket.IO with CORS
 const io = new Server(server, {
   cors: {
     origin: process.env.FRONTEND_URL || "http://localhost:3001",
@@ -18,11 +17,9 @@ const io = new Server(server, {
   }
 });
 
-// Make io accessible to routes
 app.set('io', io);
 
-// Middleware
-app.use(cors()); // Enable CORS for frontend
+app.use(cors()); // enable for frontend
 app.use(bodyParser.json());
 
 // Routes
@@ -47,10 +44,10 @@ app.use((err, req, res, next) => {
 
 // WebSocket connection handling
 io.on('connection', (socket) => {
-  console.log('🔌 Client connected:', socket.id);
+  console.log('Client connected:', socket.id);
   
   socket.on('disconnect', () => {
-    console.log('🔌 Client disconnected:', socket.id);
+    console.log('Client disconnected:', socket.id);
   });
 });
 
@@ -59,10 +56,10 @@ server.listen(PORT, async () => {
   console.log(`🚀 Nixo FDE Slackbot listening on port ${PORT}`);
   console.log(`📡 Slack events endpoint: http://localhost:${PORT}/slack/events`);
   console.log(`📊 API endpoint: http://localhost:${PORT}/api/tickets`);
-  console.log(`🔌 WebSocket server running`);
+  console.log(`WebSocket server running`);
   
   // Test Supabase connection
-  console.log('\n🔌 Testing Supabase connection...');
+  console.log('\nTesting Supabase connection...');
   await testConnection();
   console.log('');
 });

@@ -94,9 +94,9 @@ ngrok http 3000
 3. **Check backend logs**:
    ```
    📨 Received message: "Getting 500 error when uploading files"
-   ✅ Classified: bug (confidence: 0.95)
-   🔍 Group key: upload-error-500
-   ✅ Created new ticket: 1 - Upload error with 500 status
+   Classified: bug (confidence: 0.95)
+   Group key: upload-error-500
+   Created new ticket: 1 - Upload error with 500 status
    ```
 
 4. **Query the API**:
@@ -164,8 +164,8 @@ System finds existing tickets using keyword matching.
 
 | Operation | Target | Actual | Status |
 |-----------|--------|--------|--------|
-| AI Classification | <9s | ~0.5s | ✅ |
-| Group Key Generation | <9s | ~0.5s | ✅ |
-| Fuzzy Matching | <9s | ~0.1s | ✅ |
-| Database Write | <9s | ~0.1s | ✅ |
-| **Total E2E** | **<9s** | **~1.5s** | ✅ |
+| AI Classification | <9s | ~0.5s | |
+| Group Key Generation | <9s | ~0.5s | |
+| Fuzzy Matching | <9s | ~0.1s | |
+| Database Write | <9s | ~0.1s | |
+| **Total E2E** | **<9s** | **~1.5s** | |

@@ -12,10 +12,10 @@ The system uses **Gemini 2.0 Flash AI** to classify incoming Slack messages into
 
 | Category | Relevant? | Description |
 |----------|-----------|-------------|
-| `support` | ✅ Yes | Help requests, troubleshooting, user assistance |
-| `bug` | ✅ Yes | Errors, crashes, broken functionality |
-| `feature_request` | ✅ Yes | Enhancement suggestions, new capability requests |
-| `question` | ✅ Yes | Product questions, deployment inquiries |
+| `support` | Yes | Help requests, troubleshooting, user assistance |
+| `bug` | Yes | Errors, crashes, broken functionality |
+| `feature_request` | Yes | Enhancement suggestions, new capability requests |
+| `question` | Yes | Product questions, deployment inquiries |
 | `irrelevant` | ❌ No | Greetings, casual chat, acknowledgments |
 
 ---
@@ -295,10 +295,10 @@ Different file types and operations → **Different tickets**
 
 | Metric | Target | Actual | Status |
 |--------|--------|--------|--------|
-| Classification Latency | <9s | ~0.5s | ✅ Excellent |
-| Grouping Latency | <9s | ~0.5s | ✅ Excellent |
-| Total Processing | <9s | ~1.5s | ✅ Excellent |
-| Accuracy (manual review) | >85% | ~92% | ✅ Good |
+| Classification Latency | <9s | ~0.5s | Excellent |
+| Grouping Latency | <9s | ~0.5s | Excellent |
+| Total Processing | <9s | ~1.5s | Excellent |
+| Accuracy (manual review) | >85% | ~92% | Good |
 
 ---
 
